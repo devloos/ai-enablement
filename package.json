@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@ai-sdk/react": "^4.0.143",
     "ai": "^7.0.140",
     "next": "16.4.0",
     "react": "19.3.0",
