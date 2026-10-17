@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@ai-sdk/react": "^4.0.143",
+    "@modelcontextprotocol/server": "^2.3.1",
     "ai": "^7.0.140",
+    "mcp-handler": "^2.3.0",
     "next": "16.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
