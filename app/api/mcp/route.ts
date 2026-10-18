@@ -13,12 +13,32 @@ const handler = createMcpHandler((server) => {
       }),
     },
     async ({ product }) => {
-      console.log(">>> MCP TOOL CALLED: get_sales_summary", product);
       const data = {
         product,
         thisWeek: 312,
         lastWeek: 416,
         changePercent: -25,
+      };
+      return {
+        content: [{ type: "text", text: JSON.stringify(data) }],
+      };
+    }
+  );
+
+  server.registerTool(
+    "get_inventory",
+    {
+      title: "Get Inventory",
+      description:
+        "Get weekly unit sales for a product: this week vs last week",
+      inputSchema: z.object({
+        product: z.string().describe("Product name, e.g. 'trail runner'"),
+      }),
+    },
+    async ({ product }) => {
+      const data = {
+        product,
+        inventory: 100,
       };
       return {
         content: [{ type: "text", text: JSON.stringify(data) }],
@@ -36,7 +56,6 @@ const handler = createMcpHandler((server) => {
       }),
     },
     async ({ query }) => {
-      console.log(">>> MCP TOOL CALLED: search_company_docs", query);
       const data = {
         query,
         results: [
