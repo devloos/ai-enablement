@@ -29,8 +29,7 @@ const handler = createMcpHandler((server) => {
     "get_inventory",
     {
       title: "Get Inventory",
-      description:
-        "Get weekly unit sales for a product: this week vs last week",
+      description: "Get inventory for a product",
       inputSchema: z.object({
         product: z.string().describe("Product name, e.g. 'trail runner'"),
       }),
