@@ -1,6 +1,7 @@
 import { createMcpHandler } from "mcp-handler";
 import { z } from "zod";
 import { getToken } from "@vercel/connect";
+import { getSalesSummary, PRODUCT_TITLES } from "@/lib/sales";
 
 // The only channel this server may post to. Use the channel ID (Slack → channel details → bottom).
 const ALLOWED_CHANNEL = "C0CB1DTSJUQ";
@@ -11,18 +12,24 @@ const handler = createMcpHandler((server) => {
     {
       title: "Get Sales Summary",
       description:
-        "Get weekly unit sales for a product: this week vs last week",
+        "Get unit sales and revenue for a product: last 7 days vs the 7 days before, with a breakdown by size.",
       inputSchema: z.object({
-        product: z.string().describe("Product name, e.g. 'trail runner'"),
+        product: z.string().min(1).describe("Product name, e.g. 'trail runner'"),
       }),
     },
     async ({ product }) => {
-      const data = {
-        product,
-        thisWeek: 312,
-        lastWeek: 416,
-        changePercent: -25,
-      };
+      const data = getSalesSummary(product);
+      if (!data) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Unknown product "${product}". Known products: ${PRODUCT_TITLES.join(", ")}`,
+            },
+          ],
+        };
+      }
       return {
         content: [{ type: "text", text: JSON.stringify(data) }],
       };
