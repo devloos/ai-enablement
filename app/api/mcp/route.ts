@@ -1,6 +1,12 @@
 import { createMcpHandler } from "mcp-handler";
 import { z } from "zod";
 import { getToken } from "@vercel/connect";
+import {
+  registerAppResource,
+  registerAppTool,
+  RESOURCE_MIME_TYPE,
+} from "@modelcontextprotocol/ext-apps/server";
+import { CARD_URI, loadCardHtml } from "@/lib/slack-card";
 import { DOC_TITLES, searchDocs } from "@/lib/docs";
 import { getSalesSummary, PRODUCT_TITLES } from "@/lib/sales";
 import {
@@ -13,6 +19,7 @@ import {
 
 // The only channel this server may post to. Use the channel ID (Slack → channel details → bottom).
 const ALLOWED_CHANNEL = "C0CB1DTSJUQ";
+const CHANNEL_NAME = "#ops";
 
 const handler = createMcpHandler((server) => {
   server.registerTool(
@@ -122,15 +129,45 @@ const handler = createMcpHandler((server) => {
     }
   );
 
-  server.registerTool(
-    "post_slack_message",
+  // Step 1 of 2: the model drafts. Nothing is posted; Claude shows the approval card instead.
+  registerAppTool(
+    server,
+    "draft_slack_message",
     {
-      title: "Post Slack Message",
+      title: "Draft Slack Message",
       description:
-        "Post a short message to the team's #ops Slack channel. Use only when the user asks to share something.",
+        "Draft a short message for the team's #ops Slack channel. Shows the user an approval card; " +
+        "nothing is posted until they approve it there. Use only when the user asks to share something.",
       inputSchema: z.object({
-        text: z.string().min(1).max(2000).describe("The message to post"),
+        text: z.string().min(1).max(2000).describe("The message to propose"),
       }),
+      annotations: { readOnlyHint: true },
+      _meta: { ui: { resourceUri: CARD_URI } },
+    },
+    async ({ text }) => ({
+      content: [
+        {
+          type: "text",
+          text: "Draft shown to the user in an approval card. Nothing has been posted. Wait for the user to approve or deny it.",
+        },
+      ],
+      // The card reads this. The draft lives in the card, so the server stores nothing.
+      structuredContent: { text, channel: CHANNEL_NAME },
+    })
+  );
+
+  // Step 2 of 2: app-only. Hidden from the model, so only a click in the card can post.
+  registerAppTool(
+    server,
+    "approve_slack_message",
+    {
+      title: "Approve Slack Message",
+      description: "Post an approved message to #ops. Called by the approval card only.",
+      inputSchema: z.object({
+        text: z.string().min(1).max(2000),
+      }),
+      annotations: { readOnlyHint: false, openWorldHint: true },
+      _meta: { ui: { resourceUri: CARD_URI, visibility: ["app"] } },
     },
     async ({ text }) => {
       const token = await getToken("slack/brandops-slack", {
@@ -159,6 +196,19 @@ const handler = createMcpHandler((server) => {
         content: [{ type: "text", text: `Posted to Slack (ts ${data.ts})` }],
       };
     }
+  );
+
+  // The card's HTML. Claude fetches this when draft_slack_message runs.
+  registerAppResource(
+    server,
+    "Slack approval card",
+    CARD_URI,
+    { description: "Approve, edit, or deny a proposed Slack message." },
+    async () => ({
+      contents: [
+        { uri: CARD_URI, mimeType: RESOURCE_MIME_TYPE, text: await loadCardHtml(CHANNEL_NAME) },
+      ],
+    })
   );
 });
 
