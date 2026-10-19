@@ -11,14 +11,19 @@ export async function shopifyGraphql<T>(
   variables: Record<string, unknown>
 ): Promise<T> {
   // No `scopes` here: Shopify fixes scopes when the app is installed (set them on the connector).
-  const token = await getToken(CONNECTOR, { subject: { type: "app" } });
+  const token = await getToken(CONNECTOR, {
+    subject: { type: "user", id: "brandops-store" },
+  });
 
   const res = await fetch(
     `https://${SHOP_DOMAIN}/admin/api/${API_VERSION}/graphql.json`,
     {
       method: "POST",
       // Shopify uses its own header, not `Authorization: Bearer`.
-      headers: { "X-Shopify-Access-Token": token, "Content-Type": "application/json" },
+      headers: {
+        "X-Shopify-Access-Token": token,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ query, variables }),
     }
   );
@@ -26,7 +31,9 @@ export async function shopifyGraphql<T>(
 
   // Like Slack, GraphQL can return HTTP 200 with an `errors` array.
   if (!res.ok || body.errors) {
-    throw new Error(`Shopify error (${res.status}): ${JSON.stringify(body.errors ?? body)}`);
+    throw new Error(
+      `Shopify error (${res.status}): ${JSON.stringify(body.errors ?? body)}`
+    );
   }
   return body.data as T;
 }
@@ -36,13 +43,22 @@ export async function shopifyGraphql<T>(
  * Strips search syntax (`:`, quotes, parens) so input like "status:draft OR *" can't widen the search.
  */
 export function toSearchQuery(product: string) {
-  return product.replace(/[^\p{L}\p{N}\s.-]/gu, " ").replace(/\s+/g, " ").trim();
+  return product
+    .replace(/[^\p{L}\p{N}\s.-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export type InventoryProductNode = {
   title: string;
   totalInventory: number;
-  variants: { nodes: { title: string; sku: string | null; inventoryQuantity: number | null }[] };
+  variants: {
+    nodes: {
+      title: string;
+      sku: string | null;
+      inventoryQuantity: number | null;
+    }[];
+  };
 };
 
 /** Shape a Shopify product into what the tool returns: total stock plus stock by size. */
@@ -63,7 +79,11 @@ export const INVENTORY_QUERY = /* GraphQL */ `
         title
         totalInventory
         variants(first: 50) {
-          nodes { title sku inventoryQuantity }
+          nodes {
+            title
+            sku
+            inventoryQuantity
+          }
         }
       }
     }
