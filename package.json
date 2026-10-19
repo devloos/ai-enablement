@@ -11,11 +11,14 @@
   "dependencies": {
     "@ai-sdk/react": "^4.0.143",
     "@modelcontextprotocol/server": "^2.3.1",
+    "@vercel/connect": "^2.5.2",
     "ai": "^7.0.140",
+    "dotenv": "^18.0.8",
     "mcp-handler": "^2.3.0",
     "next": "16.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "tsx": "^4.23.15",
     "zod": "^4.6.7"
   },
   "devDependencies": {

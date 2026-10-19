@@ -1,5 +1,9 @@
 import { createMcpHandler } from "mcp-handler";
 import { z } from "zod";
+import { getToken } from "@vercel/connect";
+
+// The only channel this server may post to. Use the channel ID (Slack → channel details → bottom).
+const ALLOWED_CHANNEL = "C0CB1DTSJUQ";
 
 const handler = createMcpHandler((server) => {
   server.registerTool(
@@ -70,6 +74,45 @@ const handler = createMcpHandler((server) => {
       };
       return {
         content: [{ type: "text", text: JSON.stringify(data) }],
+      };
+    }
+  );
+
+  server.registerTool(
+    "post_slack_message",
+    {
+      title: "Post Slack Message",
+      description:
+        "Post a short message to the team's #ops Slack channel. Use only when the user asks to share something.",
+      inputSchema: z.object({
+        text: z.string().min(1).max(2000).describe("The message to post"),
+      }),
+    },
+    async ({ text }) => {
+      const token = await getToken("slack/brandops-slack", {
+        subject: { type: "app" },
+        scopes: ["chat:write"],
+      });
+
+      const res = await fetch("https://slack.com/api/chat.postMessage", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ channel: ALLOWED_CHANNEL, text }),
+      });
+      const data = await res.json();
+
+      // Slack returns HTTP 200 even on failure. Check `ok`.
+      if (!data.ok) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: `Slack error: ${data.error}` }],
+        };
+      }
+      return {
+        content: [{ type: "text", text: `Posted to Slack (ts ${data.ts})` }],
       };
     }
   );
