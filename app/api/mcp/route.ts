@@ -1,6 +1,7 @@
 import { createMcpHandler } from "mcp-handler";
 import { z } from "zod";
 import { getToken } from "@vercel/connect";
+import { DOC_TITLES, searchDocs } from "@/lib/docs";
 import { getSalesSummary, PRODUCT_TITLES } from "@/lib/sales";
 import {
   INVENTORY_QUERY,
@@ -92,27 +93,31 @@ const handler = createMcpHandler((server) => {
     "search_company_docs",
     {
       title: "Search Company Docs",
-      description: "Search the company docs for information",
+      description:
+        "Search company policy docs: reorder rules, core sizes, size curves, approvals, alerts, returns.",
       inputSchema: z.object({
-        query: z.string().describe("The query to search the company docs for"),
+        query: z
+          .string()
+          .min(1)
+          .max(200)
+          .describe("Keywords to search for, e.g. 'reorder rule' or 'trail runner sizes'"),
       }),
     },
     async ({ query }) => {
-      const data = {
-        query,
-        results: [
-          {
-            title: "Reorder policy",
-            text: "Reorder when any core size drops below 30 units. Lead time is 3 weeks.",
-          },
-          {
-            title: "Size curve",
-            text: "Sizes 9-10.5 make up 55% of trail runner sales.",
-          },
-        ],
-      };
+      const results = searchDocs(query);
+      if (results.length === 0) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `No docs match "${query}". Available docs: ${DOC_TITLES.join(", ")}`,
+            },
+          ],
+        };
+      }
       return {
-        content: [{ type: "text", text: JSON.stringify(data) }],
+        content: [{ type: "text", text: JSON.stringify({ query, results }) }],
       };
     }
   );
