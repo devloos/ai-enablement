@@ -2,6 +2,13 @@ import { createMcpHandler } from "mcp-handler";
 import { z } from "zod";
 import { getToken } from "@vercel/connect";
 import { getSalesSummary, PRODUCT_TITLES } from "@/lib/sales";
+import {
+  INVENTORY_QUERY,
+  shopifyGraphql,
+  summarizeInventory,
+  toSearchQuery,
+  type InventoryProductNode,
+} from "@/lib/shopify";
 
 // The only channel this server may post to. Use the channel ID (Slack → channel details → bottom).
 const ALLOWED_CHANNEL = "C0CB1DTSJUQ";
@@ -40,19 +47,44 @@ const handler = createMcpHandler((server) => {
     "get_inventory",
     {
       title: "Get Inventory",
-      description: "Get inventory for a product",
+      description:
+        "Get live stock from Shopify for products matching a name: total units and units by size.",
       inputSchema: z.object({
-        product: z.string().describe("Product name, e.g. 'trail runner'"),
+        product: z.string().min(1).describe("Product name, e.g. 'trail runner'"),
       }),
     },
     async ({ product }) => {
-      const data = {
-        product,
-        inventory: 100,
-      };
-      return {
-        content: [{ type: "text", text: JSON.stringify(data) }],
-      };
+      const q = toSearchQuery(product);
+      if (!q) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: "Product name has no searchable text." }],
+        };
+      }
+
+      try {
+        const data = await shopifyGraphql<{ products: { nodes: InventoryProductNode[] } }>(
+          INVENTORY_QUERY,
+          { q }
+        );
+        const results = data.products.nodes.map(summarizeInventory);
+        if (results.length === 0) {
+          return {
+            isError: true,
+            content: [{ type: "text", text: `No Shopify products match "${product}".` }],
+          };
+        }
+        return {
+          content: [{ type: "text", text: JSON.stringify({ results }) }],
+        };
+      } catch (err) {
+        // Log the full error for you; give the model a short one.
+        console.error("get_inventory failed", err);
+        return {
+          isError: true,
+          content: [{ type: "text", text: "Could not reach Shopify. Try again later." }],
+        };
+      }
     }
   );
 
